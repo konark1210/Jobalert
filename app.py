@@ -37,7 +37,12 @@ def clean_value(value):
     elif isinstance(value, (int, np.int64)):
         return int(value)
     else:
-        return str(value).strip()
+        # Clean string values
+        cleaned = str(value).strip()
+        # Log location values for debugging
+        if any(key in str(value).lower() for key in ['location', 'place', 'city', 'area']):
+            logger.debug(f"Cleaning location value: {value} -> {cleaned}")
+        return cleaned
 
 def get_consolidated_file():
     try:
@@ -77,6 +82,11 @@ def load_jobs():
             df.columns = [clean_column_name(col) for col in df.columns]
             logger.info(f"Columns in sheet {sheet_name}: {list(df.columns)}")
             
+            # Log location-related columns for debugging
+            location_columns = [col for col in df.columns if any(key in col.lower() for key in ['location', 'place', 'city', 'area'])]
+            if location_columns:
+                logger.info(f"Found location columns in sheet {sheet_name}: {location_columns}")
+            
             # Convert DataFrame to list of dictionaries with proper handling of data types
             jobs = []
             for idx, row in df.iterrows():
@@ -87,6 +97,11 @@ def load_jobs():
                     # Ensure there's an ID field
                     if 'id' not in job_dict or not job_dict['id']:
                         job_dict['id'] = str(idx + 1)
+                    
+                    # Log location data for debugging
+                    location_data = {k: v for k, v in job_dict.items() if any(key in k.lower() for key in ['location', 'place', 'city', 'area'])}
+                    if location_data:
+                        logger.debug(f"Job {job_dict.get('id')} location data: {location_data}")
                     
                     jobs.append(job_dict)
                     
