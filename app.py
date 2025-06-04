@@ -6,6 +6,7 @@ import os
 import logging
 import traceback
 import numpy as np
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,12 +64,19 @@ def get_consolidated_file():
 def load_jobs():
     consolidated_file = get_consolidated_file()
     if not consolidated_file:
-        return {}
+        return {
+            "error": "No data file found",
+            "last_updated": None,
+            "jobs": {}
+        }
     
     try:
         logger.info(f"Loading jobs from {consolidated_file}")
         excel_file = pd.ExcelFile(consolidated_file)
         jobs_data = {}
+        
+        # Get file modification time
+        last_updated = datetime.fromtimestamp(os.path.getmtime(consolidated_file))
         
         # Read each sheet from the consolidated file
         for sheet_name in excel_file.sheet_names:
@@ -114,11 +122,19 @@ def load_jobs():
             jobs_data[sheet_name] = jobs
             logger.info(f"Successfully processed {len(jobs)} jobs from sheet {sheet_name}")
         
-        return jobs_data
+        return {
+            "error": None,
+            "last_updated": last_updated.isoformat(),
+            "jobs": jobs_data
+        }
     except Exception as e:
         logger.error(f"Error loading jobs: {str(e)}")
         logger.error(traceback.format_exc())
-        return {}
+        return {
+            "error": "Error loading jobs data",
+            "last_updated": None,
+            "jobs": {}
+        }
 
 @app.route('/')
 def index():
@@ -132,15 +148,18 @@ def index():
 @app.route('/api/jobs')
 def get_jobs():
     try:
-        jobs_data = load_jobs()
-        if not jobs_data:
-            logger.warning("No jobs data found")
-            return jsonify({"error": "No jobs data found"}), 404
-        return jsonify(jobs_data)
+        result = load_jobs()
+        if result["error"]:
+            return jsonify(result), 404
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting jobs: {str(e)}")
         logger.error(traceback.format_exc())
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({
+            "error": "Internal server error",
+            "last_updated": None,
+            "jobs": {}
+        }), 500
 
 @app.route('/api/apply', methods=['POST'])
 def apply_job():

@@ -252,6 +252,7 @@
         let selectedJobId = null;
         let selectedSheetName = null;
         let selectedCompany = 'all';
+        let lastUpdated = null;
 
         // Add theme toggle functionality
         const themeToggle = document.getElementById('themeToggle');
@@ -269,6 +270,77 @@
             html.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
         });
+
+        // Show welcome message
+        function showWelcomeMessage() {
+            const container = document.getElementById('jobsContainer');
+            container.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+                        <i class="fas fa-briefcase text-4xl text-indigo-500 mb-4"></i>
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Welcome to Job Portal</h2>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">
+                            Use the filters above to find your perfect job match. You can search by company, location, or job type.
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <i class="fas fa-search text-indigo-500 mb-2"></i>
+                                <h3 class="font-semibold mb-2">Search Jobs</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Use the search bar to find specific jobs</p>
+                            </div>
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <i class="fas fa-filter text-indigo-500 mb-2"></i>
+                                <h3 class="font-semibold mb-2">Filter Results</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Narrow down jobs by company or location</p>
+                            </div>
+                            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                <i class="fas fa-paper-plane text-indigo-500 mb-2"></i>
+                                <h3 class="font-semibold mb-2">Easy Apply</h3>
+                                <p class="text-sm text-gray-600 dark:text-gray-300">Apply to jobs with just one click</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show error message
+        function showErrorMessage(message) {
+            const container = document.getElementById('jobsContainer');
+            container.innerHTML = `
+                <div class="col-span-full text-center py-12">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
+                        <i class="fas fa-exclamation-circle text-4xl text-red-500 mb-4"></i>
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">Oops! Something went wrong</h2>
+                        <p class="text-gray-600 dark:text-gray-300 mb-6">${message}</p>
+                        <button onclick="fetchJobs()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            <i class="fas fa-sync-alt mr-2"></i>Try Again
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Update last updated time
+        function updateLastUpdated(timestamp) {
+            if (!timestamp) return;
+            
+            const date = new Date(timestamp);
+            const formattedDate = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const lastUpdatedDiv = document.createElement('div');
+            lastUpdatedDiv.className = 'text-center text-sm text-gray-500 dark:text-gray-400 mt-4';
+            lastUpdatedDiv.innerHTML = `Last updated: ${formattedDate}`;
+            
+            const container = document.getElementById('jobsContainer');
+            container.parentNode.insertBefore(lastUpdatedDiv, container.nextSibling);
+        }
 
         // Add search functionality
         const searchInput = document.getElementById('searchInput');
@@ -305,22 +377,43 @@
         // Show loading state while fetching jobs
         async function fetchJobs() {
             document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('noResults').classList.add('hidden');
+            
             try {
                 const response = await fetch('/api/jobs');
                 const data = await response.json();
-                currentJobs = data;
                 
-                // Populate filters
-                populateFilters();
+                if (data.error) {
+                    showErrorMessage(data.error);
+                    return;
+                }
                 
-                // Initial display
-                displayJobs('all');
+                currentJobs = data.jobs;
+                lastUpdated = data.last_updated;
+                
+                if (Object.keys(currentJobs).length === 0) {
+                    showWelcomeMessage();
+                } else {
+                    // Populate filters
+                    populateFilters();
+                    // Initial display
+                    displayJobs('all');
+                }
+                
+                updateLastUpdated(lastUpdated);
             } catch (error) {
                 console.error('Error fetching jobs:', error);
-                alert('Error loading jobs. Please try again.');
+                showErrorMessage('Failed to load jobs. Please try again later.');
             } finally {
                 document.getElementById('loadingState').classList.add('hidden');
             }
+        }
+
+        // Populate all filters
+        function populateFilters() {
+            populateSheetFilter();
+            populateCompanyFilter();
+            populateLocationFilter();
         }
 
         // Populate sheet filter
@@ -332,7 +425,7 @@
             });
         }
 
-        // Populate company filter with unique company names
+        // Populate company filter
         function populateCompanyFilter() {
             const companies = new Set();
             Object.values(currentJobs).forEach(jobs => {
@@ -351,27 +444,41 @@
             });
         }
 
+        // Populate location filter
+        function populateLocationFilter() {
+            const locations = new Set();
+            Object.values(currentJobs).forEach(jobs => {
+                jobs.forEach(job => {
+                    const location = job['Location'] || job['location'] || job['Job Location'] || job['job_location'];
+                    if (location) {
+                        locations.add(location);
+                    }
+                });
+            });
+
+            const locationFilter = document.getElementById('locationFilter');
+            locationFilter.innerHTML = '<option value="all">All Locations</option>';
+            Array.from(locations).sort().forEach(location => {
+                locationFilter.innerHTML += `<option value="${location}">${location}</option>`;
+            });
+        }
+
         // Display jobs based on selected sheet and company
         function displayJobs(sheetName) {
             const container = document.getElementById('jobsContainer');
             container.innerHTML = '';
-            console.log('Displaying jobs for sheet:', sheetName, 'and company:', selectedCompany); // Debug log
 
             if (sheetName === 'all') {
-                // Display all jobs from all sheets
-            Object.entries(currentJobs).forEach(([sheet, jobs]) => {
-                    console.log(`Processing ${jobs.length} jobs from sheet: ${sheet}`); // Debug log
+                Object.entries(currentJobs).forEach(([sheet, jobs]) => {
                     jobs.forEach((job, index) => {
                         if (shouldDisplayJob(job)) {
-                        const card = createJobCard(job, sheet);
-                        container.appendChild(card);
+                            const card = createJobCard(job, sheet);
+                            container.appendChild(card);
                         }
                     });
                 });
             } else {
-                // Display jobs from specific sheet
                 const jobs = currentJobs[sheetName] || [];
-                console.log(`Processing ${jobs.length} jobs from sheet: ${sheetName}`); // Debug log
                 jobs.forEach((job, index) => {
                     if (shouldDisplayJob(job)) {
                         const card = createJobCard(job, sheetName);
@@ -379,6 +486,10 @@
                     }
                 });
             }
+
+            // Show no results message if no jobs are displayed
+            const visibleJobs = container.querySelectorAll('.job-card:not([style*="display: none"])');
+            document.getElementById('noResults').classList.toggle('hidden', visibleJobs.length > 0);
         }
 
         // Check if job should be displayed based on filters
@@ -390,10 +501,8 @@
 
         // Create a job card element
         function createJobCard(job, sheetName) {
-            console.log('Creating card for job:', job); // Debug log
-            
             const div = document.createElement('div');
-            div.className = 'bg-white overflow-hidden shadow rounded-lg';
+            div.className = 'job-card bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg';
             
             // Function to safely get value from job object
             const getValue = (possibleKeys) => {
@@ -409,7 +518,6 @@
             const title = getValue(['Title', 'Position', 'Role', 'JobTitle', 'Job Title', 'job_title']) || 'No Title';
             const company = getValue(['Company', 'Organization', 'Employer', 'Company Name', 'company_name']) || 'Company Not Specified';
             const location = getValue(['Location', 'Place', 'City', 'Area', 'Job Location', 'Work Location', 'location', 'job_location', 'work_location']) || 'Location Not Specified';
-            console.log('Location value:', location); // Debug log for location
             const source = getValue(['Source File', 'Source']) || '';
             const description = getValue(['Description', 'Details', 'Job Description']) || '';
             const salary = getValue(['Salary', 'Pay', 'Compensation']) || '';
@@ -417,12 +525,12 @@
             
             div.innerHTML = `
                 <div class="px-4 py-5 sm:p-6">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white">
                         ${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="job-link">${title}</a>` : title}
                     </h3>
-                    <div class="mt-2 max-w-xl text-sm text-gray-500">
-                        <p class="font-semibold">${company}</p>
-                        <p class="mt-1"><i class="fas fa-map-marker-alt mr-1"></i>${location || 'Location Not Specified'}</p>
+                    <div class="mt-2 max-w-xl text-sm text-gray-500 dark:text-gray-400">
+                        <p class="font-semibold company-name">${company}</p>
+                        <p class="mt-1 location"><i class="fas fa-map-marker-alt mr-1"></i>${location}</p>
                         ${salary ? `<p class="mt-1"><i class="fas fa-money-bill-wave mr-1"></i>${salary}</p>` : ''}
                         <p class="mt-1"><i class="fas fa-layer-group mr-1"></i>${sheetName}</p>
                         ${description ? `<p class="mt-2 text-sm">${description}</p>` : ''}
@@ -466,10 +574,10 @@
             
             document.getElementById('modalJobDetails').innerHTML = `
                 <div class="space-y-4">
-                    <p class="font-medium">Are you sure you want to apply for:</p>
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <p class="font-semibold">${title}</p>
-                        <p class="text-gray-600">${company}</p>
+                    <p class="font-medium text-gray-700 dark:text-gray-300">Are you sure you want to apply for:</p>
+                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                        <p class="font-semibold text-gray-900 dark:text-white">${title}</p>
+                        <p class="text-gray-600 dark:text-gray-300">${company}</p>
                     </div>
                 </div>
             `;
@@ -517,8 +625,33 @@
             displayJobs(document.getElementById('sheetFilter').value);
         });
 
+        document.getElementById('locationFilter').addEventListener('change', (e) => {
+            const location = e.target.value;
+            const jobs = document.querySelectorAll('.job-card');
+            
+            jobs.forEach(job => {
+                const jobLocation = job.querySelector('.location').textContent;
+                job.style.display = location === 'all' || jobLocation.includes(location) ? 'block' : 'none';
+            });
+            
+            const visibleJobs = document.querySelectorAll('.job-card:not([style*="display: none"])');
+            document.getElementById('noResults').classList.toggle('hidden', visibleJobs.length > 0);
+        });
+
         document.getElementById('closeModal').addEventListener('click', closeModal);
         document.getElementById('confirmApply').addEventListener('click', applyForJob);
+
+        // Add tooltips to filters
+        const tooltips = {
+            sheetFilter: 'Filter jobs by their source sheet',
+            companyFilter: 'Filter jobs by company name',
+            locationFilter: 'Filter jobs by location'
+        };
+
+        Object.entries(tooltips).forEach(([id, text]) => {
+            const element = document.getElementById(id);
+            element.title = text;
+        });
 
         // Initial load
         fetchJobs();
