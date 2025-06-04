@@ -7,6 +7,31 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* Base styles */
+        :root {
+            --primary-color: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg-color: #F9FAFB;
+            --card-bg: #FFFFFF;
+            --text-primary: #111827;
+            --text-secondary: #4B5563;
+        }
+
+        [data-theme="dark"] {
+            --primary-color: #6366F1;
+            --primary-hover: #818CF8;
+            --bg-color: #111827;
+            --card-bg: #1F2937;
+            --text-primary: #F9FAFB;
+            --text-secondary: #D1D5DB;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            transition: background-color 0.3s ease;
+        }
+
         /* Prevent text selection on buttons */
         .no-select {
             -webkit-tap-highlight-color: transparent;
@@ -26,30 +51,31 @@
             font-size: 16px !important;
         }
 
-        /* Improve link visibility */
+        /* Card styles */
+        .job-card {
+            background-color: var(--card-bg);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .job-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Link styles */
         .job-link {
-            color: #4F46E5;
+            color: var(--primary-color);
             text-decoration: none;
             position: relative;
+            transition: color 0.2s ease;
         }
 
-        .job-link:after {
-            content: '';
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            bottom: -2px;
-            left: 0;
-            background-color: #4F46E5;
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
+        .job-link:hover {
+            color: var(--primary-hover);
         }
 
-        .job-link:hover:after {
-            transform: scaleX(1);
-        }
-
-        /* Improve button visibility */
+        /* Button styles */
         .action-button {
             transition: all 0.2s ease;
             transform: translateY(0);
@@ -58,15 +84,73 @@
         .action-button:active {
             transform: translateY(1px);
         }
+
+        /* Loading animation */
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Search bar styles */
+        .search-bar {
+            background-color: var(--card-bg);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .search-bar:focus-within {
+            box-shadow: 0 0 0 2px var(--primary-color);
+        }
+
+        /* Filter styles */
+        .filter-select {
+            background-color: var(--card-bg);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .filter-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        /* Modal styles */
+        .modal-content {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* Theme toggle */
+        .theme-toggle {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 50;
+        }
     </style>
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-white shadow-lg sticky top-0 z-50">
+<body>
+    <nav class="bg-white dark:bg-gray-800 shadow-lg sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
-                        <h1 class="text-2xl font-bold text-gray-800">Job Portal</h1>
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Job Portal</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="search-bar rounded-lg px-4 py-2 flex items-center">
+                        <i class="fas fa-search text-gray-400 mr-2"></i>
+                        <input type="text" id="searchInput" placeholder="Search jobs..." 
+                               class="bg-transparent border-none focus:outline-none w-64 text-gray-700 dark:text-gray-200">
                     </div>
                 </div>
             </div>
@@ -75,24 +159,44 @@
 
     <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <!-- Filter Section -->
-        <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-                <label for="sheetFilter" class="block text-sm font-medium text-gray-700">Filter by Sheet</label>
-                <select id="sheetFilter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                    <option value="all">All Jobs</option>
-                </select>
+        <div class="mb-8 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                    <label for="sheetFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Sheet</label>
+                    <select id="sheetFilter" class="filter-select w-full pl-3 pr-10 py-2 rounded-md">
+                        <option value="all">All Jobs</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="companyFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Company</label>
+                    <select id="companyFilter" class="filter-select w-full pl-3 pr-10 py-2 rounded-md">
+                        <option value="all">All Companies</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="locationFilter" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Filter by Location</label>
+                    <select id="locationFilter" class="filter-select w-full pl-3 pr-10 py-2 rounded-md">
+                        <option value="all">All Locations</option>
+                    </select>
+                </div>
             </div>
-            <div>
-                <label for="companyFilter" class="block text-sm font-medium text-gray-700">Filter by Company</label>
-                <select id="companyFilter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                    <option value="all">All Companies</option>
-                </select>
-            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden flex justify-center items-center py-12">
+            <div class="loading-spinner"></div>
         </div>
 
         <!-- Job Cards Container -->
         <div id="jobsContainer" class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <!-- Jobs will be dynamically inserted here -->
+        </div>
+
+        <!-- No Results Message -->
+        <div id="noResults" class="hidden text-center py-12">
+            <i class="fas fa-search text-gray-400 text-4xl mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 dark:text-white">No jobs found</h3>
+            <p class="mt-2 text-gray-500 dark:text-gray-400">Try adjusting your filters or search terms</p>
         </div>
     </div>
 
@@ -100,21 +204,21 @@
     <div id="applicationModal" class="hidden fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                    <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+            <div class="inline-block align-bottom modal-content text-left overflow-hidden transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white" id="modal-title">
                         Apply for Job
                     </h3>
-                    <div class="mt-2">
-                        <p class="text-sm text-gray-500" id="modalJobDetails">
-                        </p>
+                    <div class="mt-4" id="modalJobDetails">
                     </div>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                    <button type="button" id="confirmApply" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm action-button touch-target">
-                        Apply
+                <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" id="confirmApply" 
+                            class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm action-button touch-target">
+                        <i class="fas fa-paper-plane mr-2"></i>Apply Now
                     </button>
-                    <button type="button" id="closeModal" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm action-button touch-target">
+                    <button type="button" id="closeModal" 
+                            class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm action-button touch-target">
                         Cancel
                     </button>
                 </div>
@@ -122,36 +226,110 @@
         </div>
     </div>
 
+    <!-- Theme Toggle Button -->
+    <button id="themeToggle" class="theme-toggle bg-white dark:bg-gray-800 rounded-full p-3 shadow-lg hover:shadow-xl transition-all duration-200">
+        <i class="fas fa-moon dark:hidden text-gray-700"></i>
+        <i class="fas fa-sun hidden dark:block text-yellow-400"></i>
+    </button>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 shadow-lg mt-12">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col items-center justify-center space-y-2">
+                <div class="text-gray-600 dark:text-gray-300 text-sm">
+                    <span class="font-medium">Konark Jain</span>
+                </div>
+                <a href="mailto:Konark1210@gmail.com" 
+                   class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 text-sm transition-colors duration-200">
+                    <i class="fas fa-envelope mr-1"></i>Konark1210@gmail.com
+                </a>
+            </div>
+        </div>
+    </footer>
+
     <script>
         let currentJobs = {};
         let selectedJobId = null;
         let selectedSheetName = null;
         let selectedCompany = 'all';
 
-        // Fetch jobs from the API
+        // Add theme toggle functionality
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            html.setAttribute('data-theme', savedTheme);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+        });
+
+        // Add search functionality
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const searchTerm = e.target.value.toLowerCase();
+                filterJobs(searchTerm);
+            }, 300);
+        });
+
+        function filterJobs(searchTerm) {
+            const jobs = document.querySelectorAll('.job-card');
+            let hasResults = false;
+
+            jobs.forEach(job => {
+                const title = job.querySelector('h3').textContent.toLowerCase();
+                const company = job.querySelector('.company-name').textContent.toLowerCase();
+                const location = job.querySelector('.location').textContent.toLowerCase();
+                
+                const matches = title.includes(searchTerm) || 
+                              company.includes(searchTerm) || 
+                              location.includes(searchTerm);
+
+                job.style.display = matches ? 'block' : 'none';
+                if (matches) hasResults = true;
+            });
+
+            document.getElementById('noResults').classList.toggle('hidden', hasResults);
+        }
+
+        // Show loading state while fetching jobs
         async function fetchJobs() {
+            document.getElementById('loadingState').classList.remove('hidden');
             try {
                 const response = await fetch('/api/jobs');
                 const data = await response.json();
-                console.log('Fetched jobs data:', data); // Debug log
                 currentJobs = data;
                 
-                // Populate sheet filter
-                const sheetFilter = document.getElementById('sheetFilter');
-                sheetFilter.innerHTML = '<option value="all">All Jobs</option>';
-                Object.keys(data).forEach(sheet => {
-                    sheetFilter.innerHTML += `<option value="${sheet}">${sheet}</option>`;
-                });
-
-                // Populate company filter
-                populateCompanyFilter();
-
-                // Initial display of all jobs
+                // Populate filters
+                populateFilters();
+                
+                // Initial display
                 displayJobs('all');
             } catch (error) {
                 console.error('Error fetching jobs:', error);
-                alert('Error loading jobs. Please check the console for details.');
+                alert('Error loading jobs. Please try again.');
+            } finally {
+                document.getElementById('loadingState').classList.add('hidden');
             }
+        }
+
+        // Populate sheet filter
+        function populateSheetFilter() {
+            const sheetFilter = document.getElementById('sheetFilter');
+            sheetFilter.innerHTML = '<option value="all">All Jobs</option>';
+            Object.keys(currentJobs).forEach(sheet => {
+                sheetFilter.innerHTML += `<option value="${sheet}">${sheet}</option>`;
+            });
         }
 
         // Populate company filter with unique company names
