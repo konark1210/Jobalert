@@ -228,6 +228,56 @@ def get_jobs():
             "jobs": {}
         })
 
+@app.route('/health')
+def health_check():
+    try:
+        # Get the consolidated file
+        consolidated_file = get_consolidated_file()
+        if not consolidated_file:
+            return jsonify({
+                "status": "error",
+                "message": "No consolidated file found",
+                "file_path": None
+            }), 500
+            
+        # Try to read the file
+        try:
+            excel_file = pd.ExcelFile(consolidated_file)
+            sheets = excel_file.sheet_names
+            total_jobs = 0
+            
+            # Count jobs in each sheet
+            for sheet in sheets:
+                df = pd.read_excel(consolidated_file, sheet_name=sheet)
+                total_jobs += len(df)
+            
+            return jsonify({
+                "status": "healthy",
+                "message": "File loaded successfully",
+                "file_path": consolidated_file,
+                "sheets": sheets,
+                "total_jobs": total_jobs,
+                "file_size": os.path.getsize(consolidated_file),
+                "file_permissions": oct(os.stat(consolidated_file).st_mode),
+                "current_directory": os.getcwd(),
+                "script_directory": os.path.dirname(os.path.abspath(__file__))
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Error reading file: {str(e)}",
+                "file_path": consolidated_file,
+                "traceback": traceback.format_exc()
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Error in health check: {str(e)}",
+            "traceback": traceback.format_exc()
+        }), 500
+
 if __name__ == '__main__':
     # Use environment variable for port if available (for production)
     port = int(os.environ.get('PORT', 8000))
