@@ -47,60 +47,83 @@ def clean_value(value):
 
 def get_consolidated_file():
     try:
-        # Look for the most recent consolidated file
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        logger.info(f"Base directory: {base_dir}")
+        # Define possible file locations
+        possible_paths = [
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "consolidated_jobs_*.xlsx"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "consolidated_jobs_*.xlsx"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "consolidated_jobs_*.xlsx"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "consolidated_jobs_*.xlsx")
+        ]
         
-        files = glob.glob(os.path.join(base_dir, "consolidated_jobs_*.xlsx"))
-        logger.info(f"Files found in base directory: {files}")
+        logger.info("Searching for consolidated jobs file in the following locations:")
+        for path in possible_paths:
+            logger.info(f"Checking path: {path}")
+            files = glob.glob(path)
+            if files:
+                logger.info(f"Found files: {files}")
+                latest_file = max(files)
+                logger.info(f"Selected latest file: {latest_file}")
+                
+                # Verify file exists and is readable
+                if not os.path.isfile(latest_file):
+                    logger.error(f"File does not exist: {latest_file}")
+                    continue
+                    
+                if not os.access(latest_file, os.R_OK):
+                    logger.error(f"File is not readable: {latest_file}")
+                    continue
+                    
+                # Log file details
+                file_stats = os.stat(latest_file)
+                logger.info(f"File size: {file_stats.st_size} bytes")
+                logger.info(f"File permissions: {oct(file_stats.st_mode)}")
+                logger.info(f"File owner: {file_stats.st_uid}")
+                logger.info(f"File group: {file_stats.st_gid}")
+                
+                return latest_file
         
-        # If no files found in current directory, try parent directory
-        if not files:
-            parent_dir = os.path.dirname(base_dir)
-            logger.info(f"Trying parent directory: {parent_dir}")
-            files = glob.glob(os.path.join(parent_dir, "consolidated_jobs_*.xlsx"))
-            logger.info(f"Files found in parent directory: {files}")
+        logger.error("No consolidated jobs file found in any location")
+        return None
         
-        if not files:
-            logger.error("No consolidated jobs file found")
-            return None
-            
-        latest_file = max(files)
-        logger.info(f"Found consolidated file: {latest_file}")
-        
-        # Verify file exists and is readable
-        if not os.path.isfile(latest_file):
-            logger.error(f"File does not exist: {latest_file}")
-            return None
-            
-        if not os.access(latest_file, os.R_OK):
-            logger.error(f"File is not readable: {latest_file}")
-            return None
-            
-        # Log file size and permissions
-        file_stats = os.stat(latest_file)
-        logger.info(f"File size: {file_stats.st_size} bytes")
-        logger.info(f"File permissions: {oct(file_stats.st_mode)}")
-        
-        return latest_file
     except Exception as e:
         logger.error(f"Error finding consolidated file: {str(e)}")
         logger.error(traceback.format_exc())
         return None
 
 def load_jobs():
-    consolidated_file = get_consolidated_file()
-    if not consolidated_file:
-        logger.error("No consolidated file found")
-        return {
-            "error": None,
-            "last_updated": None,
-            "jobs": {}
-        }
-    
     try:
+        consolidated_file = get_consolidated_file()
+        if not consolidated_file:
+            logger.error("No consolidated file found")
+            return {
+                "error": None,
+                "last_updated": None,
+                "jobs": {}
+            }
+        
         logger.info(f"Loading jobs from {consolidated_file}")
-        excel_file = pd.ExcelFile(consolidated_file)
+        
+        # Verify file exists before trying to read it
+        if not os.path.exists(consolidated_file):
+            logger.error(f"File does not exist: {consolidated_file}")
+            return {
+                "error": None,
+                "last_updated": None,
+                "jobs": {}
+            }
+            
+        # Try to read the file
+        try:
+            excel_file = pd.ExcelFile(consolidated_file)
+        except Exception as e:
+            logger.error(f"Error reading Excel file: {str(e)}")
+            logger.error(traceback.format_exc())
+            return {
+                "error": None,
+                "last_updated": None,
+                "jobs": {}
+            }
+            
         jobs_data = {}
         
         # Get file modification time
@@ -111,51 +134,41 @@ def load_jobs():
         for sheet_name in excel_file.sheet_names:
             logger.info(f"Processing sheet: {sheet_name}")
             
-            # Read the Excel sheet
-            df = pd.read_excel(consolidated_file, sheet_name=sheet_name)
-            logger.info(f"Found {len(df)} jobs in sheet {sheet_name}")
-            
-            # Clean column names
-            df.columns = [clean_column_name(col) for col in df.columns]
-            logger.info(f"Columns in sheet {sheet_name}: {list(df.columns)}")
-            
-            # Log location-related columns for debugging
-            location_columns = [col for col in df.columns if any(key in col.lower() for key in ['location', 'place', 'city', 'area'])]
-            if location_columns:
-                logger.info(f"Found location columns in sheet {sheet_name}: {location_columns}")
-            
-            # Convert DataFrame to list of dictionaries with proper handling of data types
-            jobs = []
-            for idx, row in df.iterrows():
-                try:
-                    # Clean all values in the row
-                    job_dict = {col: clean_value(row[col]) for col in df.columns}
-                    
-                    # Ensure there's an ID field
-                    if 'id' not in job_dict or not job_dict['id']:
-                        job_dict['id'] = str(idx + 1)
-                    
-                    # Log location data for debugging
-                    location_data = {k: v for k, v in job_dict.items() if any(key in k.lower() for key in ['location', 'place', 'city', 'area'])}
-                    if location_data:
-                        logger.debug(f"Job {job_dict.get('id')} location data: {location_data}")
-                    
-                    jobs.append(job_dict)
-                    
-                except Exception as e:
-                    logger.error(f"Error processing job at index {idx} in sheet {sheet_name}: {str(e)}")
-                    logger.error(f"Row data: {row.to_dict()}")
-                    logger.error(traceback.format_exc())
-                    continue
-            
-            jobs_data[sheet_name] = jobs
-            logger.info(f"Successfully processed {len(jobs)} jobs from sheet {sheet_name}")
+            try:
+                # Read the Excel sheet
+                df = pd.read_excel(consolidated_file, sheet_name=sheet_name)
+                logger.info(f"Found {len(df)} jobs in sheet {sheet_name}")
+                
+                # Clean column names
+                df.columns = [clean_column_name(col) for col in df.columns]
+                logger.info(f"Columns in sheet {sheet_name}: {list(df.columns)}")
+                
+                # Convert DataFrame to list of dictionaries
+                jobs = []
+                for idx, row in df.iterrows():
+                    try:
+                        job_dict = {col: clean_value(row[col]) for col in df.columns}
+                        if 'id' not in job_dict or not job_dict['id']:
+                            job_dict['id'] = str(idx + 1)
+                        jobs.append(job_dict)
+                    except Exception as e:
+                        logger.error(f"Error processing job at index {idx} in sheet {sheet_name}: {str(e)}")
+                        continue
+                
+                jobs_data[sheet_name] = jobs
+                logger.info(f"Successfully processed {len(jobs)} jobs from sheet {sheet_name}")
+                
+            except Exception as e:
+                logger.error(f"Error processing sheet {sheet_name}: {str(e)}")
+                logger.error(traceback.format_exc())
+                continue
         
         return {
             "error": None,
             "last_updated": last_updated.isoformat(),
             "jobs": jobs_data
         }
+        
     except Exception as e:
         logger.error(f"Error loading jobs: {str(e)}")
         logger.error(traceback.format_exc())
