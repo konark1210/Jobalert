@@ -19,26 +19,13 @@ LATEST_FILE=$(ls -t consolidated_jobs_*.xlsx | head -n1)
 if [ -n "$LATEST_FILE" ]; then
     echo "Found latest file: $LATEST_FILE"
     echo "Copying to data directory..."
-    
-    # Copy with verbose output
     cp -v "$LATEST_FILE" "data/"
-    
-    # Set permissions
-    chmod 644 "data/$LATEST_FILE"
     
     # Verify the copy
     if [ -f "data/$LATEST_FILE" ]; then
         echo "File copied successfully to data directory"
         echo "Data directory contents:"
         ls -la data/
-        
-        # Verify file is readable
-        if [ -r "data/$LATEST_FILE" ]; then
-            echo "File is readable"
-        else
-            echo "Error: File is not readable"
-            exit 1
-        fi
     else
         echo "Error: File copy failed"
         exit 1
@@ -61,10 +48,6 @@ echo "Python path:"
 which python
 echo "Environment variables:"
 env | grep -E "PYTHON|PATH"
-
-# Verify pandas installation
-echo "Verifying pandas installation..."
-python -c "import pandas; print(f'Pandas version: {pandas.__version__}')"
 
 # Start the application
 echo "Starting application..."
