@@ -42,7 +42,8 @@ def clean_value(value):
 def get_consolidated_file():
     try:
         # Look for the most recent consolidated file
-        files = glob.glob("consolidated_jobs_*.xlsx")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        files = glob.glob(os.path.join(base_dir, "consolidated_jobs_*.xlsx"))
         if not files:
             logger.error("No consolidated jobs file found")
             return None

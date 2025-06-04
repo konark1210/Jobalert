@@ -33,10 +33,6 @@ ENV/
 # Logs
 *.log
 
-# Excel files
-*.xlsx
-*.xls
-
 # OS
 .DS_Store
 Thumbs.db 
