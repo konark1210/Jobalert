@@ -50,11 +50,28 @@ def get_consolidated_file():
         # Look for the most recent consolidated file
         base_dir = os.path.dirname(os.path.abspath(__file__))
         files = glob.glob(os.path.join(base_dir, "consolidated_jobs_*.xlsx"))
+        
+        # If no files found in current directory, try parent directory
+        if not files:
+            parent_dir = os.path.dirname(base_dir)
+            files = glob.glob(os.path.join(parent_dir, "consolidated_jobs_*.xlsx"))
+        
         if not files:
             logger.error("No consolidated jobs file found")
             return None
+            
         latest_file = max(files)
         logger.info(f"Found consolidated file: {latest_file}")
+        
+        # Verify file exists and is readable
+        if not os.path.isfile(latest_file):
+            logger.error(f"File does not exist: {latest_file}")
+            return None
+            
+        if not os.access(latest_file, os.R_OK):
+            logger.error(f"File is not readable: {latest_file}")
+            return None
+            
         return latest_file
     except Exception as e:
         logger.error(f"Error finding consolidated file: {str(e)}")
@@ -150,16 +167,21 @@ def get_jobs():
     try:
         result = load_jobs()
         if result["error"]:
-            return jsonify(result), 404
+            # Return empty jobs object instead of 404
+            return jsonify({
+                "error": None,
+                "last_updated": None,
+                "jobs": {}
+            })
         return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting jobs: {str(e)}")
         logger.error(traceback.format_exc())
         return jsonify({
-            "error": "Internal server error",
+            "error": None,
             "last_updated": None,
             "jobs": {}
-        }), 500
+        })
 
 if __name__ == '__main__':
     # Use environment variable for port if available (for production)
