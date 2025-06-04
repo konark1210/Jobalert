@@ -49,12 +49,17 @@ def get_consolidated_file():
     try:
         # Look for the most recent consolidated file
         base_dir = os.path.dirname(os.path.abspath(__file__))
+        logger.info(f"Base directory: {base_dir}")
+        
         files = glob.glob(os.path.join(base_dir, "consolidated_jobs_*.xlsx"))
+        logger.info(f"Files found in base directory: {files}")
         
         # If no files found in current directory, try parent directory
         if not files:
             parent_dir = os.path.dirname(base_dir)
+            logger.info(f"Trying parent directory: {parent_dir}")
             files = glob.glob(os.path.join(parent_dir, "consolidated_jobs_*.xlsx"))
+            logger.info(f"Files found in parent directory: {files}")
         
         if not files:
             logger.error("No consolidated jobs file found")
@@ -72,6 +77,11 @@ def get_consolidated_file():
             logger.error(f"File is not readable: {latest_file}")
             return None
             
+        # Log file size and permissions
+        file_stats = os.stat(latest_file)
+        logger.info(f"File size: {file_stats.st_size} bytes")
+        logger.info(f"File permissions: {oct(file_stats.st_mode)}")
+        
         return latest_file
     except Exception as e:
         logger.error(f"Error finding consolidated file: {str(e)}")
@@ -81,8 +91,9 @@ def get_consolidated_file():
 def load_jobs():
     consolidated_file = get_consolidated_file()
     if not consolidated_file:
+        logger.error("No consolidated file found")
         return {
-            "error": "No data file found",
+            "error": None,
             "last_updated": None,
             "jobs": {}
         }
@@ -94,6 +105,7 @@ def load_jobs():
         
         # Get file modification time
         last_updated = datetime.fromtimestamp(os.path.getmtime(consolidated_file))
+        logger.info(f"File last modified: {last_updated}")
         
         # Read each sheet from the consolidated file
         for sheet_name in excel_file.sheet_names:
@@ -148,7 +160,7 @@ def load_jobs():
         logger.error(f"Error loading jobs: {str(e)}")
         logger.error(traceback.format_exc())
         return {
-            "error": "Error loading jobs data",
+            "error": None,
             "last_updated": None,
             "jobs": {}
         }
