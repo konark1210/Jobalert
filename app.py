@@ -161,31 +161,6 @@ def get_jobs():
             "jobs": {}
         }), 500
 
-@app.route('/api/apply', methods=['POST'])
-def apply_job():
-    try:
-        data = request.json
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-            
-        job_id = data.get('job_id')
-        sheet_name = data.get('sheet_name')
-        
-        if not job_id or not sheet_name:
-            return jsonify({"error": "Missing job_id or sheet_name"}), 400
-            
-        logger.info(f"Applying for job {job_id} from sheet {sheet_name}")
-        # Here you would typically handle the job application
-        # For now, we'll just return a success message
-        return jsonify({
-            'status': 'success',
-            'message': f'Successfully applied for job {job_id} from {sheet_name}'
-        })
-    except Exception as e:
-        logger.error(f"Error applying for job: {str(e)}")
-        logger.error(traceback.format_exc())
-        return jsonify({"error": "Internal server error"}), 500
-
 if __name__ == '__main__':
     # Use environment variable for port if available (for production)
     port = int(os.environ.get('PORT', 8000))

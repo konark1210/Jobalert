@@ -421,7 +421,10 @@
             const sheetFilter = document.getElementById('sheetFilter');
             sheetFilter.innerHTML = '<option value="all">All Jobs</option>';
             Object.keys(currentJobs).forEach(sheet => {
-                sheetFilter.innerHTML += `<option value="${sheet}">${sheet}</option>`;
+                // Skip "Job Matches" sheet
+                if (sheet.toLowerCase() !== 'job matches') {
+                    sheetFilter.innerHTML += `<option value="${sheet}">${sheet}</option>`;
+                }
             });
         }
 
@@ -536,83 +539,17 @@
                         ${description ? `<p class="mt-2 text-sm">${description}</p>` : ''}
                         ${source ? `<p class="mt-1 text-xs text-gray-400"><i class="fas fa-file mr-1"></i>From: ${source}</p>` : ''}
                     </div>
-                    <div class="mt-5 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                    <div class="mt-5">
                         ${url ? `
                             <a href="${url}" target="_blank" rel="noopener noreferrer"
                                class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 action-button touch-target">
                                 <i class="fas fa-external-link-alt mr-2"></i>View Job
                             </a>
                         ` : ''}
-                        <button type="button" 
-                                onclick="showApplicationModal('${getValue(['Id', 'ID', 'id']) || index}', '${sheetName}')"
-                                class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 action-button touch-target">
-                            <i class="fas fa-paper-plane mr-2"></i>Easy Apply
-                        </button>
                     </div>
                 </div>
             `;
             return div;
-        }
-
-        // Show application modal
-        function showApplicationModal(jobId, sheetName) {
-            selectedJobId = jobId;
-            selectedSheetName = sheetName;
-            const job = currentJobs[sheetName].find(j => {
-                const id = j.Id || j.ID || j.id;
-                return id == jobId;
-            });
-            
-            if (!job) {
-                console.error('Job not found:', { jobId, sheetName, availableJobs: currentJobs[sheetName] });
-                alert('Error: Job not found');
-                return;
-            }
-
-            const title = getValue(['Title', 'Position', 'Role', 'JobTitle', 'Job Title', 'job_title']) || 'this position';
-            const company = getValue(['Company', 'Organization', 'Employer', 'Company Name', 'company_name']) || 'this company';
-            
-            document.getElementById('modalJobDetails').innerHTML = `
-                <div class="space-y-4">
-                    <p class="font-medium text-gray-700 dark:text-gray-300">Are you sure you want to apply for:</p>
-                    <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                        <p class="font-semibold text-gray-900 dark:text-white">${title}</p>
-                        <p class="text-gray-600 dark:text-gray-300">${company}</p>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('applicationModal').classList.remove('hidden');
-        }
-
-        // Handle job application
-        async function applyForJob() {
-            try {
-                const response = await fetch('/api/apply', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        job_id: selectedJobId,
-                        sheet_name: selectedSheetName
-                    })
-                });
-                
-                const result = await response.json();
-                alert(result.message);
-                closeModal();
-            } catch (error) {
-                console.error('Error applying for job:', error);
-                alert('Failed to apply for the job. Please try again.');
-            }
-        }
-
-        // Close modal
-        function closeModal() {
-            document.getElementById('applicationModal').classList.add('hidden');
-            selectedJobId = null;
-            selectedSheetName = null;
         }
 
         // Event Listeners
@@ -637,9 +574,6 @@
             const visibleJobs = document.querySelectorAll('.job-card:not([style*="display: none"])');
             document.getElementById('noResults').classList.toggle('hidden', visibleJobs.length > 0);
         });
-
-        document.getElementById('closeModal').addEventListener('click', closeModal);
-        document.getElementById('confirmApply').addEventListener('click', applyForJob);
 
         // Add tooltips to filters
         const tooltips = {
