@@ -1,0 +1,14 @@
+[Unit]
+Description=Job Portal Gunicorn Service
+After=network.target
+
+[Service]
+User=YOUR_USERNAME
+Group=YOUR_GROUP
+WorkingDirectory=/Users/konarkjain/Desktop/output
+Environment="PATH=/Users/konarkjain/Desktop/output/venv/bin"
+ExecStart=/Users/konarkjain/Desktop/output/venv/bin/gunicorn -c gunicorn_config.py app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target 
