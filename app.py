@@ -55,9 +55,12 @@ def get_consolidated_file():
             os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "consolidated_jobs_*.xlsx")
         ]
         
-        logger.info("Searching for consolidated jobs file in the following locations:")
+        logger.info("=== Starting file search ===")
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Script directory: {os.path.dirname(os.path.abspath(__file__))}")
+        
         for path in possible_paths:
-            logger.info(f"Checking path: {path}")
+            logger.info(f"\nChecking path: {path}")
             files = glob.glob(path)
             if files:
                 logger.info(f"Found files: {files}")
@@ -80,6 +83,15 @@ def get_consolidated_file():
                 logger.info(f"File owner: {file_stats.st_uid}")
                 logger.info(f"File group: {file_stats.st_gid}")
                 
+                # Try to read the first few bytes to verify file is not corrupted
+                try:
+                    with open(latest_file, 'rb') as f:
+                        header = f.read(8)
+                        logger.info(f"File header: {header}")
+                except Exception as e:
+                    logger.error(f"Error reading file header: {str(e)}")
+                    continue
+                
                 return latest_file
         
         logger.error("No consolidated jobs file found in any location")
@@ -92,6 +104,7 @@ def get_consolidated_file():
 
 def load_jobs():
     try:
+        logger.info("=== Starting job loading process ===")
         consolidated_file = get_consolidated_file()
         if not consolidated_file:
             logger.error("No consolidated file found")
@@ -114,7 +127,9 @@ def load_jobs():
             
         # Try to read the file
         try:
+            logger.info("Attempting to read Excel file...")
             excel_file = pd.ExcelFile(consolidated_file)
+            logger.info(f"Successfully opened Excel file. Sheets found: {excel_file.sheet_names}")
         except Exception as e:
             logger.error(f"Error reading Excel file: {str(e)}")
             logger.error(traceback.format_exc())
@@ -132,10 +147,11 @@ def load_jobs():
         
         # Read each sheet from the consolidated file
         for sheet_name in excel_file.sheet_names:
-            logger.info(f"Processing sheet: {sheet_name}")
+            logger.info(f"\nProcessing sheet: {sheet_name}")
             
             try:
                 # Read the Excel sheet
+                logger.info(f"Reading sheet {sheet_name}...")
                 df = pd.read_excel(consolidated_file, sheet_name=sheet_name)
                 logger.info(f"Found {len(df)} jobs in sheet {sheet_name}")
                 
@@ -162,6 +178,10 @@ def load_jobs():
                 logger.error(f"Error processing sheet {sheet_name}: {str(e)}")
                 logger.error(traceback.format_exc())
                 continue
+        
+        logger.info(f"\n=== Job loading complete ===")
+        logger.info(f"Total sheets processed: {len(jobs_data)}")
+        logger.info(f"Total jobs loaded: {sum(len(jobs) for jobs in jobs_data.values())}")
         
         return {
             "error": None,
