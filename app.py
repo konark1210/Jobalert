@@ -52,7 +52,6 @@ def get_consolidated_file():
         logger.info(f"Base directory: {base_dir}")
         
         files = glob.glob(os.path.join(base_dir, "consolidated_jobs_*.xlsx"))
-<<<<<<< HEAD
         logger.info(f"Files found in base directory: {files}")
         
         # If no files found in current directory, try parent directory
@@ -62,14 +61,12 @@ def get_consolidated_file():
             files = glob.glob(os.path.join(parent_dir, "consolidated_jobs_*.xlsx"))
             logger.info(f"Files found in parent directory: {files}")
         
-=======
->>>>>>> parent of db250c5 (443)
         if not files:
             logger.error("No consolidated jobs file found")
             return None
+            
         latest_file = max(files)
         logger.info(f"Found consolidated file: {latest_file}")
-<<<<<<< HEAD
         
         # Verify file exists and is readable
         if not os.path.isfile(latest_file):
@@ -85,8 +82,6 @@ def get_consolidated_file():
         logger.info(f"File size: {file_stats.st_size} bytes")
         logger.info(f"File permissions: {oct(file_stats.st_mode)}")
         
-=======
->>>>>>> parent of db250c5 (443)
         return latest_file
     except Exception as e:
         logger.error(f"Error finding consolidated file: {str(e)}")
@@ -193,6 +188,56 @@ def get_jobs():
             "error": "Internal server error",
             "last_updated": None,
             "jobs": {}
+        }), 500
+
+@app.route('/health')
+def health_check():
+    try:
+        # Get the consolidated file
+        consolidated_file = get_consolidated_file()
+        if not consolidated_file:
+            return jsonify({
+                "status": "error",
+                "message": "No consolidated file found",
+                "file_path": None
+            }), 500
+            
+        # Try to read the file
+        try:
+            excel_file = pd.ExcelFile(consolidated_file)
+            sheets = excel_file.sheet_names
+            total_jobs = 0
+            
+            # Count jobs in each sheet
+            for sheet in sheets:
+                df = pd.read_excel(consolidated_file, sheet_name=sheet)
+                total_jobs += len(df)
+            
+            return jsonify({
+                "status": "healthy",
+                "message": "File loaded successfully",
+                "file_path": consolidated_file,
+                "sheets": sheets,
+                "total_jobs": total_jobs,
+                "file_size": os.path.getsize(consolidated_file),
+                "file_permissions": oct(os.stat(consolidated_file).st_mode),
+                "current_directory": os.getcwd(),
+                "script_directory": os.path.dirname(os.path.abspath(__file__))
+            })
+            
+        except Exception as e:
+            return jsonify({
+                "status": "error",
+                "message": f"Error reading file: {str(e)}",
+                "file_path": consolidated_file,
+                "traceback": traceback.format_exc()
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Error in health check: {str(e)}",
+            "traceback": traceback.format_exc()
         }), 500
 
 if __name__ == '__main__':

@@ -246,23 +246,6 @@
         let selectedCompany = 'all';
         let lastUpdated = null;
 
-        // Add theme toggle functionality
-        const themeToggle = document.getElementById('themeToggle');
-        const html = document.documentElement;
-        
-        // Check for saved theme preference
-        const savedTheme = localStorage.getItem('theme');
-        if (savedTheme) {
-            html.setAttribute('data-theme', savedTheme);
-        }
-
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = html.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            html.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        });
-
         // Show welcome message
         function showWelcomeMessage() {
             const container = document.getElementById('jobsContainer');
@@ -463,113 +446,83 @@
             const container = document.getElementById('jobsContainer');
             container.innerHTML = '';
 
+            let allJobs = [];
             if (sheetName === 'all') {
-                Object.entries(currentJobs).forEach(([sheet, jobs]) => {
-                    jobs.forEach((job, index) => {
-                        if (shouldDisplayJob(job)) {
-                            const card = createJobCard(job, sheet);
-                            container.appendChild(card);
-                        }
-                    });
+                // Flatten all jobs from all sheets into a single array
+                Object.values(currentJobs).forEach(jobs => {
+                    allJobs = allJobs.concat(jobs);
                 });
             } else {
-                const jobs = currentJobs[sheetName] || [];
-                jobs.forEach((job, index) => {
-                    if (shouldDisplayJob(job)) {
-                        const card = createJobCard(job, sheetName);
-                        container.appendChild(card);
-                    }
-                });
+                allJobs = currentJobs[sheetName] || [];
             }
 
-            // Show no results message if no jobs are displayed
-            const visibleJobs = container.querySelectorAll('.job-card:not([style*="display: none"])');
-            document.getElementById('noResults').classList.toggle('hidden', visibleJobs.length > 0);
+            // Filter jobs based on company and location
+            const filteredJobs = allJobs.filter(job => shouldDisplayJob(job));
+
+            if (filteredJobs.length === 0) {
+                document.getElementById('noResults').classList.remove('hidden');
+                return;
+            }
+
+            // Display each job
+            filteredJobs.forEach(job => {
+                const card = createJobCard(job, sheetName);
+                container.appendChild(card);
+            });
+
+            document.getElementById('noResults').classList.add('hidden');
         }
 
         // Check if job should be displayed based on filters
         function shouldDisplayJob(job) {
-            if (selectedCompany === 'all') return true;
-            const company = job['Company Name'] || job['company_name'];
-            return company === selectedCompany;
+            const company = job.company_name;
+            const location = job.location;
+            const selectedLocation = document.getElementById('locationFilter').value;
+
+            if (selectedCompany !== 'all' && company !== selectedCompany) {
+                return false;
+            }
+
+            if (selectedLocation !== 'all' && location !== selectedLocation) {
+                return false;
+            }
+
+            return true;
         }
 
         // Create a job card element
         function createJobCard(job, sheetName) {
             const div = document.createElement('div');
-            div.className = 'job-card rounded-lg p-6';
+            div.className = 'job-card bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6';
             
-            // Function to safely get value from job object
-            const getValue = (possibleKeys) => {
-                for (const key of possibleKeys) {
-                    if (job[key] !== undefined && job[key] !== null && job[key] !== '') {
-                        return job[key];
-                    }
-                }
-                return null;
-            };
-
-            // Get all relevant job information with fallbacks
-            const title = getValue(['Title', 'Position', 'Role', 'JobTitle', 'Job Title', 'job_title']) || 'No Title';
-            const company = getValue(['Company', 'Organization', 'Employer', 'Company Name', 'company_name']) || 'Company Not Specified';
-            const location = getValue(['Location', 'Place', 'City', 'Area', 'Job Location', 'Work Location', 'location', 'job_location', 'work_location']) || 'Location Not Specified';
-            const source = getValue(['Source File', 'Source']) || '';
-            const description = getValue(['Description', 'Details', 'Job Description']) || '';
-            const salary = getValue(['Salary', 'Pay', 'Compensation']) || '';
-            const url = getValue(['Direct URL', 'URL', 'Link', 'Job URL', 'direct_url']) || '';
+            const companyInitial = job.company_name ? job.company_name.charAt(0).toUpperCase() : '?';
             
-            // Get company initials for logo
-            const companyInitials = company
-                .split(' ')
-                .map(word => word[0])
-                .join('')
-                .toUpperCase()
-                .slice(0, 2);
-
             div.innerHTML = `
                 <div class="flex items-start space-x-4">
-                    <div class="company-logo flex-shrink-0">
-                        <span>${companyInitials}</span>
+                    <div class="company-logo">
+                        <span>${companyInitial}</span>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-1">
-                            ${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="hover:text-indigo-600 transition-colors duration-200">${title}</a>` : title}
-                        </h3>
-                        <p class="text-sm font-medium text-gray-600 mb-2">${company}</p>
-                        
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-1">${job.job_title || 'No Title'}</h3>
+                        <p class="company-name text-gray-600 dark:text-gray-300 mb-2">${job.company_name || 'Unknown Company'}</p>
                         <div class="flex flex-wrap gap-2 mb-4">
-                            <span class="job-tag">
-                                <i class="fas fa-map-marker-alt mr-1"></i>${location}
+                            <span class="location job-tag">
+                                <i class="fas fa-map-marker-alt mr-1"></i>${job.location || 'Location not specified'}
                             </span>
-                            ${salary ? `
-                                <span class="job-tag">
-                                    <i class="fas fa-money-bill-wave mr-1"></i>${salary}
-                                </span>
-                            ` : ''}
                             <span class="job-tag">
-                                <i class="fas fa-layer-group mr-1"></i>${sheetName}
+                                <i class="fas fa-calendar-alt mr-1"></i>${job.posting_date || 'Date not specified'}
                             </span>
                         </div>
-
-                        ${description ? `
-                            <p class="text-sm text-gray-600 mb-4 line-clamp-2">${description}</p>
-                        ` : ''}
-
-                        ${url ? `
-                            <a href="${url}" target="_blank" rel="noopener noreferrer"
-                               class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 action-button">
-                                <i class="fas fa-paper-plane mr-2"></i>Apply Now
+                        <div class="flex justify-between items-center">
+                            <a href="${job.direct_url}" target="_blank" class="action-button inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <i class="fas fa-external-link-alt mr-2"></i>Apply Now
                             </a>
-                        ` : ''}
-
-                        ${source ? `
-                            <p class="mt-2 text-xs text-gray-400">
-                                <i class="fas fa-file mr-1"></i>From: ${source}
-                            </p>
-                        ` : ''}
+                            <span class="text-sm text-gray-500 dark:text-gray-400">${sheetName}</span>
+                        </div>
                     </div>
                 </div>
             `;
+            
             return div;
         }
 
@@ -582,7 +535,7 @@
             displayJobs('all');
         }
 
-        // Event Listeners
+        // Add event listeners for filters
         document.getElementById('sheetFilter').addEventListener('change', (e) => {
             displayJobs(e.target.value);
         });
@@ -593,32 +546,13 @@
         });
 
         document.getElementById('locationFilter').addEventListener('change', (e) => {
-            const location = e.target.value;
-            const jobs = document.querySelectorAll('.job-card');
-            
-            jobs.forEach(job => {
-                const jobLocation = job.querySelector('.location').textContent;
-                job.style.display = location === 'all' || jobLocation.includes(location) ? 'block' : 'none';
-            });
-            
-            const visibleJobs = document.querySelectorAll('.job-card:not([style*="display: none"])');
-            document.getElementById('noResults').classList.toggle('hidden', visibleJobs.length > 0);
+            displayJobs(document.getElementById('sheetFilter').value);
         });
 
-        // Add tooltips to filters
-        const tooltips = {
-            sheetFilter: 'Filter jobs by their source sheet',
-            companyFilter: 'Filter jobs by company name',
-            locationFilter: 'Filter jobs by location'
-        };
-
-        Object.entries(tooltips).forEach(([id, text]) => {
-            const element = document.getElementById(id);
-            element.title = text;
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchJobs();
         });
-
-        // Initial load
-        fetchJobs();
     </script>
 </body>
 </html> 
